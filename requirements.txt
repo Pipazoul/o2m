@@ -24,3 +24,9 @@ Mopidy-TuneIn==1.0.0
 Mopidy-YouTube==3.1
 #Mopidy-Beets==4.0
 #Mopidy-IRControl
+
+#misc
+numpy 
+flask
+flask_cors
+mysql-connector-python
