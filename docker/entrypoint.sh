@@ -1,13 +1,15 @@
 #!/bin/bash
 
-echo "Starting o2m service"
+bash create_conf_files.sh
 
-systemctl start o2m.service
+# Start snapserver
+/usr/bin/snapserver -d -s pipe:///tmp/snapfifo?name=Snapcast
 
-echo "Starting mopidy service"
-
+# Start mopidy
 /usr/bin/mopidy --config /etc/mopidy/mopidy.conf &
 
-python3 schema.py
+#python3 schema.py
 
-python3 main.py
+python3 main.py -m flask
+
+tail -f /dev/null

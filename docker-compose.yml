@@ -15,6 +15,7 @@ services:
     volumes:
       - ./music:/app/Music
       - ./main.py:/app/main.py
+      - ./src:/app/src
       - ./schema.py:/app/schema.py
   mysql:
     image: mysql:5.7
@@ -29,6 +30,7 @@ services:
       - "3306:3306"
     volumes:
       - ./db:/var/lib/mysql
+      - ./dump.sql:/docker-entrypoint-initdb.d/dump.sql
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     environment:

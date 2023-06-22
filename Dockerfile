@@ -1,4 +1,26 @@
-FROM debian:buster-slim
+FROM ubuntu:20.04 as builder
+
+# interactive mode
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+# Install Rust gstreamer
+RUN apt update
+RUN apt install -y curl
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup toolchain install nightly
+RUN rustup default nightly
+RUN apt install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gcc pkg-config git
+RUN git clone --depth 1 https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs
+WORKDIR /app/gst-plugins-rs
+RUN cargo build --package gst-plugin-spotify -Z sparse-registry  --release 
+
+FROM ubuntu:20.04
+
+# interactive mode
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install dependencies
 RUN apt update 
@@ -7,7 +29,7 @@ RUN apt update
 RUN apt install -y wget 
 
 # Install Python
-RUN apt install -y python3.7 python3.7-dev python3-pip build-essential libssl-dev libffi-dev libxml2-dev libxslt1-dev zlib1g-dev liblircclient-dev lirc
+RUN apt install -y  python3 python3-pip git
 
 # Mopidy
 RUN mkdir -p /etc/apt/keyrings
@@ -29,33 +51,26 @@ COPY main.py /app/main.py
 COPY schema.py /app/schema.py
 COPY requirements.txt /app/requirements.txt
 COPY ./docker/entrypoint.sh ./entrypoint.sh
-
+COPY ./docker/create_conf_files.sh ./create_conf_files.sh
 RUN chmod +x ./entrypoint.sh
+RUN chmod +x ./create_conf_files.sh
 
 # Install Python dependencies with caching
 RUN --mount=type=cache,target=/root/.cache \
     pip3 install -r requirements.txt
 
-RUN systemctl enable mopidy
+# Install Rust gstreamer
+COPY --from=builder /app/gst-plugins-rs/target/release/libgstspotify.so /app/target/release/libgstspotify.so
+RUN install -m 644 /app/target/release/libgstspotify.so /usr/lib/x86_64-linux-gnu/gstreamer-1.0/
 
-# Finalise modpidy configuration
-RUN  cp samples/mopidy.conf /etc/mopidy/mopidy.conf
-RUN  chmod 777 /etc/mopidy/mopidy.conf
-#RUN  vi /etc/mopidy/mopidy.conf #and configure as needed
-RUN  mopidyctl local scan
+# Install snapcraft
+RUN apt install -y libavahi-client3 libavahi-common3 libsoxr0
+RUN wget "https://github.com/badaix/snapcast/releases/download/v0.27.0/snapserver_0.27.0-1_amd64.deb"  # May change in case of new release.
+RUN  dpkg -i snapserver_0.27.0-1_amd64.deb
+RUN  apt -f install # To fix dependencies
+#vi /etc/snapserver.conf
 
-#Tags db initialisation
-RUN  cp samples/o2m.db o2m.db #and modify as needed
-RUN  cp samples/o2m.conf /etc/mopidy/o2m.conf
-RUN  chmod 777 /etc/mopidy/o2m.conf
-
-
-#autorun o2m
-RUN  cp samples/o2m.service /lib/systemd/system/o2m.service
-RUN  chmod 644 /lib/systemd/system/o2m.service
-#RUN  vi lib/systemd/system/o2m.service #and configure if needed
-RUN  systemctl enable o2m.service
-
+RUN rm snapserver_0.27.0-1_amd64.deb
 
 
 
